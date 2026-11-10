@@ -1,4 +1,4 @@
-# 🍔 Classificador de Avaliações de Delivery com IA
+# Classificador de Avaliações de Delivery com IA
 
 Automação no **n8n** que lê avaliações de clientes de restaurantes, usa a **API do Claude (Anthropic)** para classificar cada uma por **problema, sentimento e urgência** e salva os resultados numa planilha pronta para análise.
 
@@ -6,13 +6,13 @@ Automação no **n8n** que lê avaliações de clientes de restaurantes, usa a *
 
 ---
 
-## 🎯 O problema
+## O problema
 
 Plataformas de delivery recebem milhares de avaliações em texto livre todos os dias. Ler uma por uma é inviável, e os casos mais graves (como **riscos à saúde**) podem se perder no meio de reclamações comuns.
 
 **Pergunta de negócio:** quais são os problemas mais frequentes de cada restaurante, e quais avaliações precisam de atenção imediata?
 
-## 💡 A solução
+## A solução
 
 Um fluxo automatizado que, para cada avaliação:
 
@@ -32,7 +32,7 @@ Um fluxo automatizado que, para cada avaliação:
 
 ---
 
-## ⚙️ Como funciona
+## Como funciona
 
 ```mermaid
 flowchart LR
@@ -54,7 +54,7 @@ flowchart LR
 
 ---
 
-## 🧠 Engenharia de prompt
+## Engenharia de prompt
 
 O prompt completo está em [`prompts/prompt_sistema.md`](prompts/prompt_sistema.md). Técnicas usadas:
 
@@ -66,7 +66,7 @@ O prompt completo está em [`prompts/prompt_sistema.md`](prompts/prompt_sistema.
 
 ---
 
-## 🔧 Evolução do projeto (o que deu errado e como resolvi)
+## Evolução do projeto (o que deu errado e como resolvi)
 
 ### v1: primeira versão funcional
 - A API retornou erro `temperature is deprecated for this model`. O parâmetro não é aceito pelo modelo atual, então **removi o parâmetro** e passei a garantir a consistência pelo prompt (categorias fixas, formato obrigatório e exemplo).
@@ -87,7 +87,7 @@ O prompt completo está em [`prompts/prompt_sistema.md`](prompts/prompt_sistema.
 
 ---
 
-## ✅ Validação
+## Validação
 
 Comparei a classificação da IA com um **gabarito manual** das 20 avaliações:
 
@@ -101,7 +101,7 @@ Comparei a classificação da IA com um **gabarito manual** das 20 avaliações:
 
 ---
 
-## 🔒 Segurança
+## Segurança
 
 - A chave da API fica guardada numa **credencial do n8n** (Header Auth) e **não aparece** no arquivo do workflow exportado.
 - A credencial está restrita ao domínio `api.anthropic.com`.
@@ -109,7 +109,7 @@ Comparei a classificação da IA com um **gabarito manual** das 20 avaliações:
 
 ---
 
-## 📁 Estrutura do repositório
+## Estrutura do repositório
 
 ```
 ├── README.md
@@ -124,7 +124,7 @@ Comparei a classificação da IA com um **gabarito manual** das 20 avaliações:
 └── imagens/                            # prints do fluxo e dos resultados
 ```
 
-## ▶️ Como reproduzir
+## Como reproduzir
 
 1. Crie uma conta no [n8n](https://n8n.io) e importe `workflow/classificador_avaliacoes.json`
 2. Importe `dados/avaliacoes_restaurantes.csv` numa planilha do Google Sheets (aba `avaliacoes`) e crie a aba `resultados` com os cabeçalhos: `id, restaurante, avaliacao, problemas, sentimento, urgencia, resumo`

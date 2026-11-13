@@ -1,4 +1,4 @@
-# Classificador de Avaliações de Delivery com IA
+# 🍔 Classificador de Avaliações de Delivery com IA
 
 Automação no **n8n** que lê avaliações de clientes de restaurantes, usa a **API do Claude (Anthropic)** para classificar cada uma por **problema, sentimento e urgência** e salva os resultados numa planilha pronta para análise.
 
@@ -8,13 +8,13 @@ Automação no **n8n** que lê avaliações de clientes de restaurantes, usa a *
 
 ---
 
-## O problema
+## 🎯 O problema
 
 Plataformas de delivery recebem milhares de avaliações em texto livre todos os dias. Ler uma por uma é inviável, e os casos mais graves (como **riscos à saúde**) podem se perder no meio de reclamações comuns.
 
 **Pergunta de negócio:** quais são os problemas mais frequentes de cada restaurante, e quais avaliações precisam de atenção imediata?
 
-## A solução
+## 💡 A solução
 
 Um fluxo automatizado que, para cada avaliação:
 
@@ -34,7 +34,7 @@ Um fluxo automatizado que, para cada avaliação:
 
 ---
 
-## Como funciona
+## ⚙️ Como funciona
 
 ```mermaid
 flowchart LR
@@ -56,7 +56,7 @@ flowchart LR
 
 ---
 
-## Engenharia de prompt
+## 🧠 Engenharia de prompt
 
 O prompt completo está em [`prompts/prompt_sistema.md`](prompts/prompt_sistema.md). Técnicas usadas:
 
@@ -89,7 +89,40 @@ O prompt completo está em [`prompts/prompt_sistema.md`](prompts/prompt_sistema.
 
 ---
 
-## Dashboard dos resultados
+## 🤖 Versão 2: orquestração de agentes
+
+O classificador evoluiu para uma **equipe de 3 agentes de IA** que trabalham coordenados (workflow em [`workflow/orquestracao_agentes.json`](workflow/orquestracao_agentes.json)):
+
+```mermaid
+flowchart LR
+    A[📄 Avaliações] --> B[🤖 Agente Classificador]
+    B --> C{🔀 Coordenador<br/>urgência alta?}
+    C -- sim --> D[🚨 Agente de Alerta<br/>alerta interno ao time de qualidade]
+    C -- não --> E[💬 Agente de Resposta<br/>resposta ao cliente]
+    D --> F[📊 Planilha respostas]
+    E --> F
+```
+
+![Orquestração no n8n](imagens/orquestracao.png)
+
+| Agente | Papel | Recebe |
+|---|---|---|
+| **Classificador** | Identifica problemas, sentimento e urgência | O texto da avaliação |
+| **Coordenador** (nó IF) | Roteia cada avaliação pela urgência | A classificação |
+| **Alerta** | Escreve um alerta interno: o que aconteceu, o risco e uma ação recomendada | Avaliação + problemas identificados |
+| **Resposta** | Escreve uma resposta curta e empática ao cliente | Avaliação + problemas + sentimento |
+
+**Resultado:** 20 avaliações processadas, com **2 alertas internos** (os dois casos de risco à saúde) e **18 respostas ao cliente**.
+
+**Guardrail:** o Agente de Resposta é instruído a **não prometer reembolso, cupom nem prazo**. Nenhuma das 18 respostas fez promessas.
+
+**O que observei e melhoraria:**
+- **Voz inconsistente:** algumas respostas usam "Fico feliz" e outras "Ficamos felizes". Dá para padronizar no prompt (ex.: "use sempre a primeira pessoa do plural").
+- **Human-in-the-loop:** os alertas sugerem ações fortes, como suspender o restaurante. Num sistema real, isso deve ser uma **recomendação para uma pessoa decidir**, não uma ação automática.
+
+---
+
+## 📊 Dashboard dos resultados
 
 Os resultados da classificação estão num **dashboard web publicado**, com indicadores, gráficos e filtros:
 
@@ -105,7 +138,7 @@ O dashboard foi construído com **Lovable (vibe coding)**. O código está em [d
 
 ---
 
-## Validação
+## ✅ Validação
 
 Comparei a classificação da IA com um **gabarito manual** das 20 avaliações:
 
@@ -119,7 +152,7 @@ Comparei a classificação da IA com um **gabarito manual** das 20 avaliações:
 
 ---
 
-## Segurança
+## 🔒 Segurança
 
 - A chave da API fica guardada numa **credencial do n8n** (Header Auth) e **não aparece** no arquivo do workflow exportado.
 - A credencial está restrita ao domínio `api.anthropic.com`.
@@ -127,12 +160,13 @@ Comparei a classificação da IA com um **gabarito manual** das 20 avaliações:
 
 ---
 
-## Estrutura do repositório
+## 📁 Estrutura do repositório
 
 ```
 ├── README.md
 ├── workflow/
-│   └── classificador_avaliacoes.json   # workflow exportado do n8n
+│   ├── classificador_avaliacoes.json   # v1: classificador
+│   └── orquestracao_agentes.json       # v2: orquestração de 3 agentes
 ├── prompts/
 │   └── prompt_sistema.md               # prompt usado e decisões de design
 ├── codigo/
@@ -142,7 +176,7 @@ Comparei a classificação da IA com um **gabarito manual** das 20 avaliações:
 └── imagens/                            # prints do fluxo e dos resultados
 ```
 
-## Como reproduzir
+## ▶️ Como reproduzir
 
 1. Crie uma conta no [n8n](https://n8n.io) e importe `workflow/classificador_avaliacoes.json`
 2. Importe `dados/avaliacoes_restaurantes.csv` numa planilha do Google Sheets (aba `avaliacoes`) e crie a aba `resultados` com os cabeçalhos: `id, restaurante, avaliacao, problemas, sentimento, urgencia, resumo`
@@ -154,7 +188,8 @@ Comparei a classificação da IA com um **gabarito manual** das 20 avaliações:
 ## 🚀 Próximos passos
 
 - [ ] Gatilho por **webhook**, para classificar avaliações em tempo real
-- [ ] **Alerta automático** (e-mail ou Slack) para avaliações de urgência alta
+- [x] **Agente de alerta** para avaliações de urgência alta (v2)
+- [ ] Enviar os alertas por e-mail ou Slack
 - [x] **Dashboard** com os problemas mais frequentes por restaurante ([ver](https://painel-avaliacoes-ia.lovable.app))
 - [ ] Processamento em lote para volumes maiores
 

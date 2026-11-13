@@ -1,0 +1,276 @@
+{
+  "name": "Classificador de Avaliações com IA",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "2b02c4aa-9c7b-41eb-999e-a5e8820f3d34",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "COLE_AQUI_O_ID_DA_SUA_PLANILHA",
+          "mode": "list",
+          "cachedResultName": "Avaliacoes restaurantes",
+          "cachedResultUrl": "COLE_AQUI_O_LINK_DA_SUA_PLANILHA"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "avaliacoes",
+          "cachedResultUrl": "COLE_AQUI_O_LINK_DA_SUA_PLANILHA#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        0
+      ],
+      "id": "44ef3184-4196-4cbf-826f-e1f93e9677c2",
+      "name": "Ler avaliações",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "TOG8y5CFWsEejGWr",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "=json",
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "jsonBody": "={\n  \"model\": \"claude-haiku-5-5\",\n  \"max_tokens\": 1500,\n  \"system\": \"Você classifica avaliações de delivery de comida. Categorias permitidas: atraso, temperatura, item_faltando, pedido_errado, qualidade_comida, embalagem, atendimento, preco, seguranca_alimentar, elogio. Critérios de urgência: alta = risco à saúde (alergia, comida crua, contaminação); media = problema que prejudicou a refeição (pedido errado, item faltando, atraso grande, comida fria, atendimento ruim); baixa = elogios, comentários sobre preço ou problemas leves. Responda APENAS com um JSON válido, sem texto antes ou depois, no formato: {\\\"problemas\\\": [lista de categorias], \\\"sentimento\\\": \\\"positivo|negativo|misto\\\", \\\"urgencia\\\": \\\"baixa|media|alta\\\", \\\"resumo\\\": \\\"frase curta\\\"}. Exemplo: avaliação 'Chegou frio e faltou o suco' -> {\\\"problemas\\\": [\\\"temperatura\\\", \\\"item_faltando\\\"], \\\"sentimento\\\": \\\"negativo\\\", \\\"urgencia\\\": \\\"media\\\", \\\"resumo\\\": \\\"Pedido frio e incompleto\\\"}\",\n  \"messages\": [\n    { \"role\": \"user\", \"content\": {{ JSON.stringify($json.avaliacao) }} }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "id": "7279b8be-a858-4461-b182-b4d6cf68997e",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "gwnvF1y266gYIj3r",
+          "name": "Claude API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const avaliacoes = $('Ler avaliações').all();\n\nreturn $input.all().map((item, i) => {\n  const original = avaliacoes[i].json;\n  let texto = item.json.content?.find(c => c.type === 'text')?.text ?? '';\n\n  \n  const inicio = texto.indexOf('{');\n  const fim = texto.lastIndexOf('}');\n  if (inicio >= 0 && fim > inicio) {\n    texto = texto.slice(inicio, fim + 1);\n  }\n\n  let r;\n  try {\n    r = JSON.parse(texto);\n  } catch (e) {\n        r = { problemas: ['erro_leitura'], sentimento: '', urgencia: '', resumo: texto || ('Sem resposta: ' + item.json.stop_reason) };\n  }\n\n  return {\n    json: {\n      id: original.id,\n      restaurante: original.restaurante,\n      \n      avaliacao: String(original.avaliacao).replace(/^\"|\"$/g, ''),\n      problemas: (r.problemas || []).join(', '),\n      sentimento: r.sentimento,\n      urgencia: r.urgencia,\n      resumo: r.resumo\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "24c5906c-f23f-432c-98e2-71e98935dfc4",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "COLE_AQUI_O_ID_DA_SUA_PLANILHA",
+          "mode": "list",
+          "cachedResultName": "Avaliacoes restaurantes",
+          "cachedResultUrl": "COLE_AQUI_O_LINK_DA_SUA_PLANILHA"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1958820548,
+          "mode": "list",
+          "cachedResultName": "resultados",
+          "cachedResultUrl": "COLE_AQUI_O_LINK_DA_SUA_PLANILHA#gid=1958820548"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "restaurante",
+              "displayName": "restaurante",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "avaliacao",
+              "displayName": "avaliacao",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "problemas",
+              "displayName": "problemas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "sentimento",
+              "displayName": "sentimento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "urgencia",
+              "displayName": "urgencia",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "resumo",
+              "displayName": "resumo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        896,
+        0
+      ],
+      "id": "568f12af-2da5-47b4-8ea0-103cb857c446",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "TOG8y5CFWsEejGWr",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Ler avaliações",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler avaliações": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "53042b4c-6ee2-46ca-a86d-b43ea1953050",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "id": "oaVk2vk5SgEMVn45",
+  "tags": []
+}

@@ -1,0 +1,490 @@
+{
+  "name": "Orquestração de Agentes - Avaliações",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "ca114139-cc75-434a-a6ec-439c6e06c849",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "COLE_AQUI_O_ID_DA_SUA_PLANILHA",
+          "mode": "list",
+          "cachedResultName": "Avaliacoes restaurantes",
+          "cachedResultUrl": "COLE_AQUI_O_LINK_DA_SUA_PLANILHA"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "avaliacoes",
+          "cachedResultUrl": "COLE_AQUI_O_LINK_DA_SUA_PLANILHA#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        0
+      ],
+      "id": "beb422b6-bad9-418a-988b-1a7a26fc4278",
+      "name": "Ler avaliações",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "TOG8y5CFWsEejGWr",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "=json",
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "jsonBody": "={\n  \"model\": \"claude-haiku-5-5\",\n  \"max_tokens\": 1500,\n  \"system\": \"Você classifica avaliações de delivery de comida. Categorias permitidas: atraso, temperatura, item_faltando, pedido_errado, qualidade_comida, embalagem, atendimento, preco, seguranca_alimentar, elogio. Critérios de urgência: alta = risco à saúde (alergia, comida crua, contaminação); media = problema que prejudicou a refeição (pedido errado, item faltando, atraso grande, comida fria, atendimento ruim); baixa = elogios, comentários sobre preço ou problemas leves. Responda APENAS com um JSON válido, sem texto antes ou depois, no formato: {\\\"problemas\\\": [lista de categorias], \\\"sentimento\\\": \\\"positivo|negativo|misto\\\", \\\"urgencia\\\": \\\"baixa|media|alta\\\", \\\"resumo\\\": \\\"frase curta\\\"}. Exemplo: avaliação 'Chegou frio e faltou o suco' -> {\\\"problemas\\\": [\\\"temperatura\\\", \\\"item_faltando\\\"], \\\"sentimento\\\": \\\"negativo\\\", \\\"urgencia\\\": \\\"media\\\", \\\"resumo\\\": \\\"Pedido frio e incompleto\\\"}\",\n  \"messages\": [\n    { \"role\": \"user\", \"content\": {{ JSON.stringify($json.avaliacao) }} }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "id": "2138a76c-1d9c-4191-b30a-869697b64112",
+      "name": "Agente Classificador",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "gwnvF1y266gYIj3r",
+          "name": "Claude API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const avaliacoes = $('Ler avaliações').all();\n\nreturn $input.all().map((item, i) => {\n  const original = avaliacoes[i].json;\n  let texto = item.json.content?.find(c => c.type === 'text')?.text ?? '';\n\n  \n  const inicio = texto.indexOf('{');\n  const fim = texto.lastIndexOf('}');\n  if (inicio >= 0 && fim > inicio) {\n    texto = texto.slice(inicio, fim + 1);\n  }\n\n  let r;\n  try {\n    r = JSON.parse(texto);\n  } catch (e) {\n        r = { problemas: ['erro_leitura'], sentimento: '', urgencia: '', resumo: texto || ('Sem resposta: ' + item.json.stop_reason) };\n  }\n\n  return {\n    json: {\n      id: original.id,\n      restaurante: original.restaurante,\n      \n      avaliacao: String(original.avaliacao).replace(/^\"|\"$/g, ''),\n      problemas: (r.problemas || []).join(', '),\n      sentimento: r.sentimento,\n      urgencia: r.urgencia,\n      resumo: r.resumo\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "cfcdfb0b-46b1-4924-84b4-ec39decaa2d5",
+      "name": "Organizar classificação"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "581932e5-7684-4508-b497-596f0ecd2412",
+              "leftValue": "={{ $json.urgencia }}",
+              "rightValue": "alta",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        896,
+        0
+      ],
+      "id": "51cce417-2588-469a-ae7f-063f34b9c95b",
+      "name": "Urgência alta?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "=json",
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "jsonBody": "={\n  \"model\": \"claude-haiku-5-5\",\n  \"max_tokens\": 1000,\n  \"system\": \"Você alerta o time de qualidade de um app de delivery sobre avaliações com risco à saúde do cliente. Escreva um alerta interno curto, em português, com: 1) o que aconteceu, 2) o risco, 3) uma ação imediata recomendada. No máximo 4 linhas. Responda apenas com o texto do alerta.\",\n  \"messages\": [\n    { \"role\": \"user\", \"content\": {{ JSON.stringify(\"Restaurante: \" + $json.restaurante + \"\\nAvaliação: \" + $json.avaliacao + \"\\nProblemas: \" + $json.problemas) }} }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1136,
+        -96
+      ],
+      "id": "1ec9d005-f43b-4e09-9426-8aba56d407de",
+      "name": "Agente de Alerta",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "gwnvF1y266gYIj3r",
+          "name": "Claude API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "=json",
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "jsonBody": "={\n  \"model\": \"claude-haiku-5-5\",\n  \"max_tokens\": 1500,\n  \"system\": \"Você é o atendimento de um app de delivery e responde avaliações de clientes. Escreva uma resposta curta (no máximo 3 frases), em português, educada e empática, adequada ao sentimento: agradeça os elogios; para problemas, peça desculpas e diga que o restaurante será informado. Não prometa reembolso, cupom nem prazo. Responda apenas com o texto da resposta ao cliente.\",\n  \"messages\": [\n    { \"role\": \"user\", \"content\": {{ JSON.stringify(\"Avaliação: \" + $json.avaliacao + \"\\nProblemas: \" + $json.problemas + \"\\nSentimento: \" + $json.sentimento) }} }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1152,
+        128
+      ],
+      "id": "5d6d4b6a-113a-4137-94fd-9876bbcbe298",
+      "name": "Agente de Resposta",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "gwnvF1y266gYIj3r",
+          "name": "Claude API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const entradas = $('Urgência alta?').all(1);\n\nreturn $input.all().map((item, i) => ({\n  json: {\n    ...entradas[i].json,\n    tipo: 'resposta_cliente',\n    mensagem: item.json.content?.find(c => c.type === 'text')?.text\n      ?? ('Sem resposta: ' + item.json.stop_reason)\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1376,
+        128
+      ],
+      "id": "13d597fe-ee04-4e82-aa06-3b7cb4ce8809",
+      "name": "Montar resposta"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "COLE_AQUI_O_ID_DA_SUA_PLANILHA",
+          "mode": "list",
+          "cachedResultName": "Avaliacoes restaurantes",
+          "cachedResultUrl": "COLE_AQUI_O_LINK_DA_SUA_PLANILHA"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2028581060,
+          "mode": "list",
+          "cachedResultName": "respostas",
+          "cachedResultUrl": "COLE_AQUI_O_LINK_DA_SUA_PLANILHA#gid=2028581060"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "restaurante",
+              "displayName": "restaurante",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "avaliacao",
+              "displayName": "avaliacao",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "problemas",
+              "displayName": "problemas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sentimento",
+              "displayName": "sentimento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "urgencia",
+              "displayName": "urgencia",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "resumo",
+              "displayName": "resumo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tipo",
+              "displayName": "tipo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mensagem",
+              "displayName": "mensagem",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1616,
+        0
+      ],
+      "id": "cf4ca7e0-99a7-4674-95f2-31a1d1bf5910",
+      "name": "Salvar respostas",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "TOG8y5CFWsEejGWr",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const entradas = $('Urgência alta?').all(0);\n\nreturn $input.all().map((item, i) => ({\n  json: {\n    ...entradas[i].json,\n    tipo: 'alerta_interno',\n    mensagem: item.json.content?.find(c => c.type === 'text')?.text\n      ?? ('Sem resposta: ' + item.json.stop_reason)\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        -96
+      ],
+      "id": "2b5a5bb5-5339-4314-80bb-37915c42a930",
+      "name": "Montar alerta"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Ler avaliações",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler avaliações": {
+      "main": [
+        [
+          {
+            "node": "Agente Classificador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agente Classificador": {
+      "main": [
+        [
+          {
+            "node": "Organizar classificação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Organizar classificação": {
+      "main": [
+        [
+          {
+            "node": "Urgência alta?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Urgência alta?": {
+      "main": [
+        [
+          {
+            "node": "Agente de Alerta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Agente de Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agente de Resposta": {
+      "main": [
+        [
+          {
+            "node": "Montar resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar resposta": {
+      "main": [
+        [
+          {
+            "node": "Salvar respostas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agente de Alerta": {
+      "main": [
+        [
+          {
+            "node": "Montar alerta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar alerta": {
+      "main": [
+        [
+          {
+            "node": "Salvar respostas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "6ad478bb-c7c8-4ed2-83ed-5e666cfe1ba3",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "id": "F9RYQX1LSg56XKhw",
+  "tags": []
+}
